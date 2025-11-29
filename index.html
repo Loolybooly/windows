@@ -1,0 +1,528 @@
+<!-- 
+========================================================================================================================================================================
+  PROJECT: WINDOWS 11 (AI EDITION)
+  FILE: win11_final.html
+  
+  CHANGES:
+  - Added the requested disclaimer in the Start Menu.
+  - Retained the "Offset Click Technology™" (aim 15px high to click buttons).
+  - Retained the "Lag Engine" (0.5s delay).
+  - Retained the Edge Rickroll protocol.
+  
+  Enjoy.
+========================================================================================================================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 11</title>
+    
+    <style>
+        /*
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        GLOBAL LAG SETTINGS
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            cursor: default;
+            font-family: 'Segoe UI', sans-serif;
+            /* 
+               THE LAG:
+               0.5s delay on everything. Movement, resizing, hovering, color changes.
+            */
+            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); 
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        /*
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        WINDOW STYLES
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        */
+        .window {
+            position: absolute;
+            background: #f3f3f3;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: scale(0.95);
+            min-width: 300px;
+            min-height: 200px;
+            overflow: hidden;
+        }
+
+        .window.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .window.minimized {
+            opacity: 0;
+            transform: scale(0.7) translateY(300px);
+            pointer-events: none;
+        }
+
+        .window.maximized {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: calc(100% - 48px) !important;
+            border-radius: 0;
+            transform: none;
+        }
+
+        .title-bar {
+            height: 35px;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        /*
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        THE BROKEN CONTROLS (HITBOX LOGIC)
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        */
+        .win-controls {
+            position: relative;
+            display: flex;
+            gap: 8px;
+            height: 100%;
+            align-items: center;
+        }
+        
+        /* The Visual Buttons (FAKE) */
+        .visual-btn {
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            pointer-events: none; 
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .v-close { background: #ff5f57; }
+        .v-min { background: #febc2e; }
+        .v-max { background: #28c840; }
+
+        /* The Actual Hitboxes - Invisible and shifted UP by 15px */
+        .hitbox-container {
+            position: absolute;
+            top: -15px; /* THE SHIFT */
+            left: 0;
+            display: flex;
+            gap: 8px;
+            height: 30px; /* Taller to catch clicks */
+            align-items: center;
+        }
+
+        .real-btn {
+            width: 13px;
+            height: 13px; 
+            background: red; 
+            opacity: 0;      
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .real-btn:hover {
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); 
+        }
+
+        /*
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        RESIZE HANDLES
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        */
+        .resizer {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: se-resize;
+            z-index: 10;
+        }
+        .resizer::after {
+            content: '';
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid #999;
+            border-bottom: 2px solid #999;
+        }
+
+        /*
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        OTHER UI ELEMENTS
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        */
+        .content {
+            flex: 1;
+            background: white;
+            overflow: auto;
+            position: relative;
+        }
+
+        #taskbar {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 48px;
+            background: rgba(243, 243, 243, 0.85);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid rgba(255,255,255,0.5);
+            z-index: 9999;
+        }
+
+        .tb-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.4s;
+        }
+        .tb-icon:hover { background: rgba(255,255,255,0.6); transform: translateY(-4px); }
+        .tb-icon img { width: 24px; height: 24px; }
+        
+        .tb-icon.open-app {
+            background-color: rgba(255,255,255,0.4);
+            border-bottom: 3px solid #0078d4;
+        }
+
+        #desktop { padding: 10px; display: flex; flex-direction: column; flex-wrap: wrap; height: calc(100% - 50px); }
+        .icon { width: 86px; height: 100px; margin: 5px 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+        .icon:hover { background-color: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255,255,255,0.3); }
+        .icon-img { width: 48px; height: 48px; margin-bottom: 5px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+        .icon-text { color: white; font-size: 12px; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.8); line-height: 1.2; max-width: 80px; }
+
+        .activate-windows { position: fixed; bottom: 60px; right: 20px; color: rgba(255,255,255,0.4); font-size: 14px; pointer-events: none; z-index: 500; }
+        
+        /* Start Menu */
+        #start-menu { 
+            position: absolute; 
+            bottom: -650px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 500px; 
+            height: 520px; /* Slight height increase */
+            background: #f2f2f2; 
+            border-radius: 8px; 
+            z-index: 9998; 
+            padding: 20px; 
+            transition: bottom 0.6s; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.2); 
+            display: flex;
+            flex-direction: column;
+        }
+        #start-menu.open { bottom: 58px; }
+    </style>
+</head>
+<body>
+
+    <div class="activate-windows">Activate Windows<br>Go to Settings to activate Windows.</div>
+
+    <!-- BOOT SCREEN -->
+    <div id="boot" style="position:fixed; top:0; left:0; width:100%; height:100%; background:black; color:white; display:flex; justify-content:center; align-items:center; flex-direction:column; z-index:99999;">
+        <div style="width:40px; height:40px; border:3px solid #333; border-top:3px solid #00a4ef; border-radius:50%; animation:spin 2s linear infinite;"></div>
+        <br><span style="font-family:'Segoe UI Light';">Updates are underway. 100% complete.</span>
+        <style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>
+    </div>
+
+    <!-- DESKTOP ICONS -->
+    <div id="desktop">
+        <div class="icon" ondblclick="createWindow('pc')">
+            <img src="https://img.icons8.com/color/96/000000/monitor.png" class="icon-img"><span class="icon-text">This PC</span>
+        </div>
+        <div class="icon" ondblclick="createWindow('edge')">
+            <img src="https://img.icons8.com/color/96/000000/ms-edge-new.png" class="icon-img"><span class="icon-text">Microsoft Edge</span>
+        </div>
+        <div class="icon" ondblclick="createWindow('bin')">
+            <img src="https://img.icons8.com/fluency/96/000000/full-trash.png" class="icon-img"><span class="icon-text">Recycle Bin</span>
+        </div>
+        <div class="icon" ondblclick="createWindow('word')">
+            <img src="https://img.icons8.com/color/96/000000/microsoft-word-2019--v2.png" class="icon-img"><span class="icon-text">Word</span>
+        </div>
+    </div>
+
+    <!-- START MENU -->
+    <div id="start-menu">
+        <input type="text" placeholder="Type here to search" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px;">
+        
+        <h4 style="margin:0 0 10px 0;">Pinned</h4>
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; flex-grow:1;">
+            <div style="text-align:center;" onclick="createWindow('edge')"><img src="https://img.icons8.com/color/48/000000/ms-edge-new.png"><br><small>Edge</small></div>
+            <div style="text-align:center;" onclick="createWindow('word')"><img src="https://img.icons8.com/color/48/000000/microsoft-word-2019--v2.png"><br><small>Word</small></div>
+            <div style="text-align:center;" onclick="createWindow('excel')"><img src="https://img.icons8.com/color/48/000000/microsoft-excel-2019--v1.png"><br><small>Excel</small></div>
+            <div style="text-align:center;" onclick="createWindow('calc')"><img src="https://img.icons8.com/color/48/000000/calculator.png"><br><small>Calc</small></div>
+            <div style="text-align:center;" onclick="createWindow('ppt')"><img src="https://img.icons8.com/color/48/000000/microsoft-powerpoint-2019--v1.png"><br><small>PowerPt</small></div>
+            <div style="text-align:center;" onclick="createWindow('store')"><img src="https://img.icons8.com/color/48/000000/microsoft-store.png"><br><small>Store</small></div>
+        </div>
+
+        <!-- THE AI DISCLAIMER -->
+        <div style="margin-top: 20px; padding-top:15px; border-top:1px solid #ddd; font-size: 11px; color: #777; font-style: italic; text-align: center;">
+            *and yes, before you ask, this website was made entirely by AI, just like W*ndows (:
+        </div>
+
+        <!-- User Profile Bar -->
+        <div style="margin-top:15px; display:flex; align-items:center; padding:10px; background:#e0e0e0; border-radius:4px;">
+            <div style="width:30px; height:30px; background:#555; border-radius:50%;"></div>
+            <span style="margin-left:10px; font-weight:bold; font-size:12px;">User</span>
+            <div style="flex:1;"></div>
+            <img src="https://img.icons8.com/ios-glyphs/30/000000/shutdown.png" style="opacity:0.6; cursor:pointer; width:20px;" onclick="location.reload()">
+        </div>
+    </div>
+
+    <!-- TASKBAR -->
+    <div id="taskbar">
+        <div class="tb-icon" onclick="document.getElementById('start-menu').classList.toggle('open')"><img src="https://img.icons8.com/fluency/48/000000/windows-11.png"></div>
+        <!-- Taskbar icons that will restore minimized windows -->
+        <div class="tb-icon" id="tb-edge" onclick="restoreWindow('edge')"><img src="https://img.icons8.com/color/48/000000/ms-edge-new.png"></div>
+        <div class="tb-icon" id="tb-word" onclick="restoreWindow('word')"><img src="https://img.icons8.com/color/48/000000/microsoft-word-2019--v2.png"></div>
+        <div class="tb-icon" id="tb-pc" onclick="restoreWindow('pc')"><img src="https://img.icons8.com/fluency/48/000000/folder-invoices--v1.png"></div>
+        
+        <!-- Clock -->
+        <div style="position:absolute; right:10px; font-size:12px; text-align:right;">
+            <span id="time">12:00 PM</span><br><span id="date">10/27/2023</span>
+        </div>
+    </div>
+
+    <!-- CONTAINER FOR WINDOWS -->
+    <div id="win-container"></div>
+
+    <script>
+        /*
+        ================================================================================================
+        LOGIC CORE
+        ================================================================================================
+        */
+        
+        // 1. Boot
+        window.onload = function() {
+            setTimeout(() => { document.getElementById('boot').style.display = 'none'; }, 2000);
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('time').innerText = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                document.getElementById('date').innerText = now.toLocaleDateString();
+            }, 1000);
+        };
+
+        // Track open windows to toggle them
+        let openWindows = {}; 
+
+        // 2. Window Factory
+        function createWindow(type) {
+            document.getElementById('start-menu').classList.remove('open');
+            
+            // If window exists, just restore it
+            if (openWindows[type]) {
+                restoreWindow(type);
+                return;
+            }
+
+            const id = 'win-' + Date.now();
+            const container = document.getElementById('win-container');
+            const win = document.createElement('div');
+            win.className = 'window';
+            win.id = id;
+            win.dataset.type = type; 
+
+            // Default positioning
+            win.style.top = '15%';
+            win.style.left = '20%';
+            win.style.width = '700px';
+            win.style.height = '500px';
+
+            // Mark taskbar icon as active
+            const tbIcon = document.getElementById('tb-' + type);
+            if(tbIcon) tbIcon.classList.add('open-app');
+
+            // Generate Content based on App
+            let title = 'Application';
+            let content = '';
+
+            if (type === 'edge') {
+                title = 'Microsoft Edge';
+                content = `<div id="edge-content-${id}" style="height:100%; display:flex; justify-content:center; align-items:center;"><div class="loader" style="border:3px solid #ccc; border-top:3px solid blue; border-radius:50%; width:30px; height:30px; animation:spin 1s infinite;"></div></div>`;
+                
+                // Rickroll Logic
+                setTimeout(() => {
+                    const el = document.getElementById(`edge-content-${id}`);
+                    if(el) {
+                        const vidId = 'vid-'+id;
+                        el.innerHTML = `
+                            <div style="width:100%; height:100%; display:flex; flex-direction:column; background:black;">
+                                <div style="background:#eee; padding:5px; border-bottom:1px solid #ccc;">https://youtube.com/watch?v=dQw4w9WgXcQ</div>
+                                <video id="${vidId}" style="flex:1; width:100%;" autoplay controls>
+                                    <source src="https://ia800300.us.archive.org/17/items/Rick_Astley_Never_Gonna_Give_You_Up/Rick_Astley_Never_Gonna_Give_You_Up.mp4" type="video/mp4">
+                                </video>
+                            </div>
+                        `;
+                        // Attempt autoplay
+                        setTimeout(() => { try { document.getElementById(vidId).play(); } catch(e){} }, 500);
+                    }
+                }, 7000);
+            } else if (type === 'word') {
+                title = 'Word';
+                content = '<div style="padding:20px;" contenteditable="true"><h1>Document 1</h1><p>Type something...</p></div>';
+            } else if (type === 'pc') {
+                title = 'This PC';
+                content = '<div style="padding:20px;">C: Drive <div style="width:200px; height:20px; background:linear-gradient(90deg, red 90%, #eee 90%);"></div></div>';
+            } else {
+                content = '<div style="padding:20px;">App loading...</div>';
+            }
+
+            // HTML Structure: NOTE THE OFFSET HITBOXES
+            win.innerHTML = `
+                <div class="title-bar">
+                    <div>${title}</div>
+                    <div class="win-controls">
+                        <!-- FAKE VISUALS -->
+                        <div class="visual-btn v-min"></div>
+                        <div class="visual-btn v-max"></div>
+                        <div class="visual-btn v-close"></div>
+
+                        <!-- REAL HITBOXES (Shifted UP via CSS) -->
+                        <div class="hitbox-container">
+                            <div class="real-btn" onclick="minimizeWindow('${id}')" title="Minimize"></div>
+                            <div class="real-btn" onclick="maximizeWindow('${id}')" title="Maximize"></div>
+                            <div class="real-btn" onclick="closeWindow('${id}', '${type}')" title="Close"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="content">${content}</div>
+                <!-- Resizer Handle -->
+                <div class="resizer"></div>
+            `;
+
+            container.appendChild(win);
+            openWindows[type] = win;
+
+            // Initialize Drag and Resize
+            makeDraggable(win);
+            makeResizable(win);
+
+            // Activate animation
+            setTimeout(() => win.classList.add('active'), 50);
+            bringToFront(win);
+        }
+
+        // 3. Window Actions
+        function closeWindow(id, type) {
+            const win = document.getElementById(id);
+            win.classList.remove('active');
+            delete openWindows[type];
+            const tbIcon = document.getElementById('tb-' + type);
+            if(tbIcon) tbIcon.classList.remove('open-app');
+            setTimeout(() => win.remove(), 500);
+        }
+
+        function minimizeWindow(id) {
+            const win = document.getElementById(id);
+            win.classList.add('minimized');
+            win.classList.remove('active');
+        }
+
+        function maximizeWindow(id) {
+            const win = document.getElementById(id);
+            win.classList.toggle('maximized');
+        }
+
+        function restoreWindow(type) {
+            const win = openWindows[type];
+            if (win) {
+                win.classList.remove('minimized');
+                win.classList.add('active');
+                bringToFront(win);
+            } else {
+                createWindow(type);
+            }
+        }
+
+        function bringToFront(win) {
+            document.querySelectorAll('.window').forEach(w => w.style.zIndex = 100);
+            win.style.zIndex = 101;
+        }
+
+        // 4. Drag Logic
+        function makeDraggable(elmnt) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            const header = elmnt.querySelector('.title-bar');
+            header.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                bringToFront(elmnt);
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        // 5. Resize Logic
+        function makeResizable(win) {
+            const resizer = win.querySelector('.resizer');
+            resizer.addEventListener('mousedown', initResize, false);
+
+            function initResize(e) {
+                window.addEventListener('mousemove', Resize, false);
+                window.addEventListener('mouseup', stopResize, false);
+                bringToFront(win);
+            }
+
+            function Resize(e) {
+                win.style.width = (e.clientX - win.offsetLeft) + 'px';
+                win.style.height = (e.clientY - win.offsetTop) + 'px';
+            }
+
+            function stopResize(e) {
+                window.removeEventListener('mousemove', Resize, false);
+                window.removeEventListener('mouseup', stopResize, false);
+            }
+        }
+    </script>
+</body>
+</html>
